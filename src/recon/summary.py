@@ -2,7 +2,8 @@
 Summary CSV builder for reconciliation results.
 
 Produces a tidy, one-row-per-event summary and applies sensible rounding so the CSV
-is easy to read (no scientific notation, consistent decimal places).
+is easy to read (no scientific notation, consistent decimal places). Also normalizes
+signed zero values like -0.0 to 0.0.
 """
 
 from __future__ import annotations
@@ -67,6 +68,8 @@ def build_summary_dataframe(
       - Shares deltas: integer
       - Risk score & confidence: 2 decimals
       - Day offsets: integer
+
+    Also normalizes any signed zero (e.g., -0.0) to 0.0 in float columns.
     """
     rows: List[Dict[str, object]] = []
     for ev, d, rp, cls in zip(events, diffs, risks, classes):
@@ -106,5 +109,14 @@ def build_summary_dataframe(
         df["shares_delta_after_loan"] = df["shares_delta_after_loan"].round(0).astype(int)
     if "pay_date_offset_days" in df.columns:
         df["pay_date_offset_days"] = df["pay_date_offset_days"].astype(int)
+
+    # Normalize signed zeros in float columns (e.g., convert -0.0 to 0.0)
+    float_cols = [
+        "amount_delta_qc", "amount_delta_sc", "fx_delta",
+        "wht_rate_delta_pp", "risk_score", "confidence",
+    ]
+    for col in float_cols:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda v: 0.0 if isinstance(v, float) and v == 0.0 else v)
 
     return df
