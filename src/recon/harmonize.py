@@ -1,10 +1,16 @@
 """
-Functions for transforming raw NBIM and Custody data into canonical event objects.
+Transform raw NBIM and Custody data into canonical event objects with per-account detail.
 """
 
 from typing import List
 import pandas as pd
-from .schemas import NBIMLeg, CustodyLeg, CanonicalEvent
+from .schemas import (
+    NBIMLeg,
+    NBIMAccountLeg,
+    CustodyLeg,
+    CanonicalEvent,
+)
+
 
 _NUMERIC_NBIM_FIELDS = [
     "NOMINAL_BASIS",
@@ -29,11 +35,11 @@ def _safe_float(x, default: float = 0.0) -> float:
 
 def to_canonical(nbim_df: pd.DataFrame, custody_df: pd.DataFrame) -> List[CanonicalEvent]:
     """
-    Convert NBIM and Custody DataFrames into canonical CanonicalEvent objects.
+    Convert NBIM and Custody DataFrames into CanonicalEvent objects.
 
-    - Aggregates NBIM rows per event (sums amounts, shares).
-    - Collects all custody legs for the event.
-    - Ensures robust float parsing.
+    - Aggregates NBIM rows per event for the event-level leg.
+    - Preserves NBIM per-account legs for attribution.
+    - Collects all custody legs for the event (per bank account).
     """
     nbim_df = nbim_df.copy()
     custody_df = custody_df.copy()
@@ -46,6 +52,7 @@ def to_canonical(nbim_df: pd.DataFrame, custody_df: pd.DataFrame) -> List[Canoni
 
     events: List[CanonicalEvent] = []
     for event_id, nbim_rows in nbim_df.groupby("COAC_EVENT_KEY"):
+        # Aggregate NBIM totals at event level
         nbim_agg = {
             "shares": nbim_rows["NOMINAL_BASIS"].sum(),
             "div_per_share": nbim_rows["DIVIDENDS_PER_SHARE"].mean(),
@@ -58,6 +65,20 @@ def to_canonical(nbim_df: pd.DataFrame, custody_df: pd.DataFrame) -> List[Canoni
         nbim_any = nbim_rows.iloc[0]
         nbim_leg = NBIMLeg(**nbim_agg)
 
+        # NBIM per-account legs for attribution
+        nbim_accounts: List[NBIMAccountLeg] = []
+        for bank_account, acc_rows in nbim_rows.groupby("BANK_ACCOUNT"):
+            nbim_accounts.append(
+                NBIMAccountLeg(
+                    bank_account=str(bank_account),
+                    shares=acc_rows["NOMINAL_BASIS"].sum(),
+                    gross_qc=acc_rows["GROSS_AMOUNT_QUOTATION"].sum(),
+                    net_qc=acc_rows["NET_AMOUNT_QUOTATION"].sum(),
+                    net_sc=acc_rows["NET_AMOUNT_SETTLEMENT"].sum(),
+                )
+            )
+
+        # Custody legs
         cust_rows = custody_df[custody_df["COAC_EVENT_KEY"].astype(str) == event_id]
         legs: List[CustodyLeg] = []
         for _, cr in cust_rows.iterrows():
@@ -83,6 +104,7 @@ def to_canonical(nbim_df: pd.DataFrame, custody_df: pd.DataFrame) -> List[Canoni
             quotation_ccy=str(nbim_any["QUOTATION_CURRENCY"]),
             settlement_ccy=str(nbim_any["SETTLEMENT_CURRENCY"]),
             nbim=nbim_leg,
+            nbim_accounts=nbim_accounts,
             custody_legs=legs,
         )
         events.append(ev)

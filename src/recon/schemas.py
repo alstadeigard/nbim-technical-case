@@ -1,5 +1,5 @@
 """
-Data schemas for canonical dividend reconciliation.
+Data schemas for canonical dividend reconciliation, including per-account detail.
 """
 
 from pydantic import BaseModel
@@ -8,7 +8,7 @@ from typing import List, Optional
 
 class NBIMLeg(BaseModel):
     """
-    Represents NBIM's internal view of a dividend event.
+    Represents NBIM's aggregated internal view of a dividend event.
     """
     shares: float
     div_per_share: float
@@ -19,9 +19,20 @@ class NBIMLeg(BaseModel):
     fx_used: float
 
 
+class NBIMAccountLeg(BaseModel):
+    """
+    NBIM per-account slice of the event (as booked internally).
+    """
+    bank_account: Optional[str]
+    shares: float
+    gross_qc: float
+    net_qc: float
+    net_sc: float
+
+
 class CustodyLeg(BaseModel):
     """
-    Represents a single custodian-reported leg of a dividend event.
+    A single custodian-reported leg of a dividend event (per bank account).
     """
     bank_account: Optional[str]
     shares: float
@@ -36,7 +47,7 @@ class CustodyLeg(BaseModel):
 
 class CanonicalEvent(BaseModel):
     """
-    Unified view of a dividend event, containing NBIM leg and custody legs.
+    Unified view of a dividend event, including NBIM aggregate, NBIM per-account legs, and custody legs.
     """
     event_id: str
     isin: str
@@ -45,12 +56,13 @@ class CanonicalEvent(BaseModel):
     quotation_ccy: str
     settlement_ccy: str
     nbim: NBIMLeg
+    nbim_accounts: List[NBIMAccountLeg]
     custody_legs: List[CustodyLeg]
 
 
 class DiffRecord(BaseModel):
     """
-    Deterministic reconciliation results for a single event.
+    Deterministic reconciliation results for a single event (aggregate-level).
     """
     event_id: str
     amount_delta_qc: float
