@@ -1,10 +1,18 @@
 """
-Entry script: run reconciliation, print summaries, policy flags, classification,
-and include per-account evidence in the audit text.
+Entry script: run reconciliation, print summaries, and (optionally) export JSON artifacts.
+
+Usage:
+    python scripts/run_local.py
+    python scripts/run_local.py --out artifacts/    # writes one JSON per event into 'artifacts/'
+    python scripts/run_local.py --nbim path/to/NBIM.csv --custody path/to/CUSTODY.csv --out outdir/
 """
 
+from __future__ import annotations
+
+import argparse
 import os
 import sys
+from typing import Optional
 
 # Ensure src/ is on sys.path
 here = os.path.dirname(os.path.abspath(__file__))
@@ -16,17 +24,55 @@ from recon.audit import generate_audit_paragraph
 from recon.attribution import per_account_attribution
 from recon.policy import risk_and_policy
 from recon.classify import classify
+from recon.export import build_event_payload, write_event_json
+
+
+def _parse_args() -> argparse.Namespace:
+    """
+    Parse CLI arguments for flexible input paths and optional export directory.
+    """
+    p = argparse.ArgumentParser(description="NBIM dividend reconciliation runner")
+    p.add_argument(
+        "--nbim",
+        type=str,
+        default=os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv"),
+        help="Path to NBIM CSV",
+    )
+    p.add_argument(
+        "--custody",
+        type=str,
+        default=os.path.join(root, "data", "CUSTODY_Dividend_Bookings 1.csv"),
+        help="Path to Custody CSV",
+    )
+    p.add_argument(
+        "--out",
+        type=str,
+        default=None,
+        help="If set, directory to write one JSON file per event",
+    )
+    return p.parse_args()
+
+
+def _ensure_dir(path: str) -> None:
+    """
+    Create directory if it doesn't exist.
+    """
+    os.makedirs(path, exist_ok=True)
 
 
 def main() -> None:
     """
     Load CSVs, run reconciliation, print numeric summary, risk flags, classification,
-    and an audit paragraph per event with embedded per-account evidence.
+    and an audit paragraph per event with embedded per-account evidence. Optionally export JSON.
     """
-    nbim_path = os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv")
-    custody_path = os.path.join(root, "data", "CUSTODY_Dividend_Bookings 1.csv")
+    args = _parse_args()
 
-    events, diffs = run(nbim_path, custody_path)
+    events, diffs = run(args.nbim, args.custody)
+
+    # Export directory preparation (if requested)
+    export_dir: Optional[str] = args.out
+    if export_dir:
+        _ensure_dir(export_dir)
 
     for ev, d in zip(events, diffs):
         # Aggregate numeric one-liner
@@ -54,7 +100,8 @@ def main() -> None:
         rows = per_account_attribution(ev)
 
         # Single audit paragraph with embedded account evidence lines
-        print(generate_audit_paragraph(ev, d, account_rows=rows))
+        audit_text = generate_audit_paragraph(ev, d, account_rows=rows)
+        print(audit_text)
 
         # Optional compact per-account table when interesting
         interesting = [
@@ -70,6 +117,19 @@ def main() -> None:
                     f"QCΔ={r['net_qc_delta']:.2f}, SCΔ={r['net_sc_delta']:.2f} "
                     f"(NBIM shares={r['nbim_shares']:.0f}, Custody shares={r['custody_shares']:.0f})"
                 )
+
+        # Export if requested
+        if export_dir:
+            payload = build_event_payload(
+                event=ev,
+                diff=d,
+                classification=cls,
+                risk=rp,
+                per_account_rows=rows,
+                audit_text=audit_text,
+            )
+            out_path = os.path.join(export_dir, f"{ev.event_id}.json")
+            write_event_json(out_path, payload)
 
         print("-" * 80)
 
