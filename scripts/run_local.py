@@ -5,11 +5,6 @@ Usage:
     python scripts/run_local.py
     python scripts/run_local.py --out artifacts --summary-csv summary.csv
     python scripts/run_local.py --use-llm --llm-provider openai --llm-model gpt-4o-mini --out artifacts --summary-csv summary.csv
-
-Environment variables (if flags omitted):
-    LLM_PROVIDER = openai | anthropic
-    LLM_MODEL    = model name (e.g., gpt-4o-mini, claude-3-haiku-20240307)
-    OPENAI_API_KEY / ANTHROPIC_API_KEY must be set for respective providers.
 """
 
 from __future__ import annotations
@@ -33,54 +28,23 @@ from recon.classify_llm import classify_llm
 from recon.remediation import suggest_remediation
 from recon.export import build_event_payload, write_event_json
 from recon.summary import build_summary_dataframe
+from recon.runlog import RunLogger
 
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="NBIM dividend reconciliation runner")
-    p.add_argument(
-        "--nbim",
-        type=str,
-        default=os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv"),
-        help="Path to NBIM CSV",
-    )
-    p.add_argument(
-        "--custody",
-        type=str,
-        default=os.path.join(root, "data", "CUSTODY_Dividend_Bookings 1.csv"),
-        help="Path to Custody CSV",
-    )
-    p.add_argument(
-        "--out",
-        type=str,
-        default=None,
-        help="If set, directory to write one JSON file per event",
-    )
+    p.add_argument("--nbim", type=str, default=os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv"))
+    p.add_argument("--custody", type=str, default=os.path.join(root, "data", "CUSTODY_Dividend_Bookings 1.csv"))
+    p.add_argument("--out", type=str, default=None, help="Directory to write one JSON file per event")
     p.add_argument(
         "--summary-csv",
         type=str,
         default=None,
-        help=(
-            "If set, path to write a one-row-per-event CSV summary. "
-            "If you pass just 'summary.csv' and also set --out, it will be placed inside --out."
-        ),
+        help="If set and --out is also set to a directory, 'summary.csv' will be written inside that directory unless a full path is provided.",
     )
-    p.add_argument(
-        "--use-llm",
-        action="store_true",
-        help="Use LLM-backed classification (falls back to rules on any error).",
-    )
-    p.add_argument(
-        "--llm-provider",
-        type=str,
-        default=None,
-        help="LLM provider: openai | anthropic. Defaults to env LLM_PROVIDER or 'openai'.",
-    )
-    p.add_argument(
-        "--llm-model",
-        type=str,
-        default=None,
-        help="LLM model name. Defaults to env LLM_MODEL or a sensible provider default.",
-    )
+    p.add_argument("--use-llm", action="store_true", help="Use LLM-backed classification.")
+    p.add_argument("--llm-provider", type=str, default=None, help="openai | anthropic")
+    p.add_argument("--llm-model", type=str, default=None, help="Model name, e.g., gpt-4o-mini")
     return p.parse_args()
 
 
@@ -90,6 +54,19 @@ def _ensure_dir(path: str) -> None:
 
 def main() -> None:
     args = _parse_args()
+
+    run_logger = RunLogger()
+    run_logger.log_run_start(
+        {
+            "nbim": args.nbim,
+            "custody": args.custody,
+            "out": args.out,
+            "summary_csv": args.summary_csv,
+            "use_llm": bool(args.use_llm),
+            "llm_provider": args.llm_provider or "openai",
+            "llm_model": args.llm_model or "gpt-4o-mini",
+        }
+    )
 
     events, diffs = run(args.nbim, args.custody)
 
@@ -120,6 +97,7 @@ def main() -> None:
                 per_account_rows=rows,
                 provider=args.llm_provider,
                 model=args.llm_model,
+                run_logger=run_logger,
             )
             source = "LLM"
         else:
@@ -154,6 +132,35 @@ def main() -> None:
                     f"QCΔ={r['net_qc_delta']:.2f}, SCΔ={r['net_sc_delta']:.2f} "
                     f"(NBIM shares={r['nbim_shares']:.0f}, Custody shares={r['custody_shares']:.0f})"
                 )
+
+        # Persist per-event structured log for audit
+        run_logger.log_event_summary(
+            event_id=ev.event_id,
+            diff={
+                "amount_delta_qc": float(d.amount_delta_qc),
+                "amount_delta_sc": float(d.amount_delta_sc),
+                "wht_rate_delta": float(d.wht_rate_delta),
+                "fx_delta": float(d.fx_delta),
+                "date_offset_pay_abs_days": int(d.date_offset_pay_abs_days),
+                "share_diff": float(d.share_diff),
+                "loan_total": float(d.loan_total),
+                "share_diff_after_loan": float(d.share_diff_after_loan),
+            },
+            risk={
+                "risk_score": float(rp.get("risk_score", 0.0)),
+                "require_review": bool(rp.get("require_review", False)),
+                "auto_close": bool(rp.get("auto_close", False)),
+            },
+            classification={
+                "break_types": list(cls.get("break_types", [])),
+                "severity": str(cls.get("severity")),
+                "confidence": float(cls.get("confidence", 0.0)),
+                "hypothesized_causes": list(cls.get("hypothesized_causes", [])),
+            },
+            actions=list(actions),
+            audit_text=audit_text,
+            per_account=list(rows),
+        )
 
         if export_dir:
             payload = build_event_payload(
