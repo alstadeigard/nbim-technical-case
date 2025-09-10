@@ -1,16 +1,18 @@
+"""
+Functions for computing deterministic reconciliation differences between NBIM and Custody.
+"""
+
 from datetime import datetime
 from .schemas import CanonicalEvent, DiffRecord
 
 
 def compute_diff(ev: CanonicalEvent) -> DiffRecord:
     """
-    Deterministic reconciliation deltas for a single event.
+    Compute reconciliation differences for a single event.
 
-    - Amount deltas computed in both quotation currency (QC) and settlement currency (SC).
-    - Withholding tax delta based on effective tax rate observed on custody vs NBIM expectation.
-    - FX delta computed from implied FX (amount-based) to avoid comparing incompatible raw FX columns.
-    - Payment date offset computed as the maximum absolute difference across custody legs.
-    - Share difference flags quantity/lending mismatches early.
+    Returns:
+        DiffRecord with amount deltas, FX delta, tax delta, share deltas,
+        loan totals, and payment date offsets.
     """
     cust_net_qc = sum(l.net_qc for l in ev.custody_legs)
     cust_net_sc = sum(l.net_sc for l in ev.custody_legs)
@@ -22,7 +24,11 @@ def compute_diff(ev: CanonicalEvent) -> DiffRecord:
     nbim_fx_implied = _implied_fx_nbim(ev)
     cust_fx_implied = _implied_fx_custody(ev)
 
-    share_diff = sum(l.shares for l in ev.custody_legs) - ev.nbim.shares
+    custody_shares = sum(l.shares for l in ev.custody_legs)
+    loan_total = sum(l.loan_quantity for l in ev.custody_legs)
+    share_diff = custody_shares - ev.nbim.shares
+    share_diff_after_loan = (custody_shares + loan_total) - ev.nbim.shares
+
     pay_offset = _max_pay_offset_days(ev)
 
     return DiffRecord(
@@ -33,16 +39,17 @@ def compute_diff(ev: CanonicalEvent) -> DiffRecord:
         fx_delta=cust_fx_implied - nbim_fx_implied,
         date_offset_pay_abs_days=pay_offset,
         share_diff=share_diff,
+        loan_total=loan_total,
+        share_diff_after_loan=share_diff_after_loan,
     )
 
 
 def _implied_fx_nbim(ev: CanonicalEvent) -> float:
     """
-    NBIM implied FX from amounts:
-        if quotation_ccy == settlement_ccy → 1.0
-        else → net_sc / net_qc (guarding division by zero)
+    Compute NBIM's implied FX rate from amounts.
 
-    This is robust to different raw FX conventions across systems.
+    If quotation and settlement currencies match → 1.0.
+    Otherwise → net_sc / net_qc.
     """
     q = (ev.quotation_ccy or "").strip()
     s = (ev.settlement_ccy or "").strip()
@@ -53,9 +60,10 @@ def _implied_fx_nbim(ev: CanonicalEvent) -> float:
 
 def _implied_fx_custody(ev: CanonicalEvent) -> float:
     """
-    Custody implied FX blended across legs:
-        per-leg ratio = net_sc / net_qc (0.0 if net_qc is 0)
-        weighted average with weights = net_qc (economic materiality)
+    Compute custody's implied FX as a weighted average across legs.
+
+    Each leg ratio = net_sc / net_qc (0 if net_qc = 0).
+    Weighted by net_qc to avoid small legs dominating.
     """
     weights = [max(l.net_qc, 0.0) for l in ev.custody_legs]
     ratios = [(l.net_sc / l.net_qc) if l.net_qc else 0.0 for l in ev.custody_legs]
@@ -65,15 +73,12 @@ def _implied_fx_custody(ev: CanonicalEvent) -> float:
 
 def _max_pay_offset_days(ev: CanonicalEvent) -> int:
     """
-    Maximum absolute difference (in days) between NBIM payment date and custody leg payment dates.
-    Accepts 'dd.mm.yyyy', 'mm/dd/yyyy', or 'yyyy-mm-dd' and normalizes to ISO for comparison.
+    Compute maximum absolute difference (days) between NBIM pay_date and custody leg pay_dates.
     """
     try:
         nb = datetime.fromisoformat(_normalize_date(ev.pay_date))
     except Exception:
-        # If NBIM date is malformed, we can’t compute an offset reliably.
         return 0
-
     leg_dates = []
     for l in ev.custody_legs:
         if not l.pay_date:
@@ -81,38 +86,30 @@ def _max_pay_offset_days(ev: CanonicalEvent) -> int:
         try:
             leg_dates.append(datetime.fromisoformat(_normalize_date(l.pay_date)))
         except Exception:
-            # Skip malformed custody dates; data-quality can be flagged elsewhere.
             continue
-
     if not leg_dates:
         return 0
-
     return max(abs((d - nb).days) for d in leg_dates)
 
 
 def _normalize_date(s: str) -> str:
     """
-    Normalize date strings into ISO 'yyyy-mm-dd'.
-    Supported inputs:
-      - 'dd.mm.yyyy' (e.g., '14.02.2025')
-      - 'mm/dd/yyyy' (e.g., '02/14/2025')
-      - 'yyyy-mm-dd' (already ISO)
+    Normalize a date string into ISO yyyy-mm-dd format.
+
+    Supports:
+        dd.mm.yyyy
+        mm/dd/yyyy
+        yyyy-mm-dd
     """
     if s is None:
         raise ValueError("Date string is None")
     s = s.strip()
     if not s:
         raise ValueError("Empty date string")
-
-    # mm/dd/yyyy
     if "/" in s:
         m, d, y = s.split("/")
         return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-
-    # dd.mm.yyyy
     if "." in s:
         d, m, y = s.split(".")
         return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-
-    # assume already ISO
     return s

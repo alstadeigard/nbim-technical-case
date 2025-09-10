@@ -1,6 +1,10 @@
-from .schemas import NBIMLeg, CustodyLeg, CanonicalEvent
+"""
+Functions for transforming raw NBIM and Custody data into canonical event objects.
+"""
+
 from typing import List
 import pandas as pd
+from .schemas import NBIMLeg, CustodyLeg, CanonicalEvent
 
 _NUMERIC_NBIM_FIELDS = [
     "NOMINAL_BASIS",
@@ -12,13 +16,25 @@ _NUMERIC_NBIM_FIELDS = [
     "DIVIDENDS_PER_SHARE",
 ]
 
-def _safe_float(x, default=0.0):
+
+def _safe_float(x, default: float = 0.0) -> float:
+    """
+    Convert a value to float, returning a default if conversion fails.
+    """
     try:
         return float(x)
     except Exception:
         return default
 
+
 def to_canonical(nbim_df: pd.DataFrame, custody_df: pd.DataFrame) -> List[CanonicalEvent]:
+    """
+    Convert NBIM and Custody DataFrames into canonical CanonicalEvent objects.
+
+    - Aggregates NBIM rows per event (sums amounts, shares).
+    - Collects all custody legs for the event.
+    - Ensures robust float parsing.
+    """
     nbim_df = nbim_df.copy()
     custody_df = custody_df.copy()
     nbim_df["COAC_EVENT_KEY"] = nbim_df["COAC_EVENT_KEY"].astype(str)
@@ -30,7 +46,6 @@ def to_canonical(nbim_df: pd.DataFrame, custody_df: pd.DataFrame) -> List[Canoni
 
     events: List[CanonicalEvent] = []
     for event_id, nbim_rows in nbim_df.groupby("COAC_EVENT_KEY"):
-        # Aggregate NBIM rows for this event (handles multiple bank accounts)
         nbim_agg = {
             "shares": nbim_rows["NOMINAL_BASIS"].sum(),
             "div_per_share": nbim_rows["DIVIDENDS_PER_SHARE"].mean(),
@@ -43,7 +58,6 @@ def to_canonical(nbim_df: pd.DataFrame, custody_df: pd.DataFrame) -> List[Canoni
         nbim_any = nbim_rows.iloc[0]
         nbim_leg = NBIMLeg(**nbim_agg)
 
-        # Collect all custody legs for this event
         cust_rows = custody_df[custody_df["COAC_EVENT_KEY"].astype(str) == event_id]
         legs: List[CustodyLeg] = []
         for _, cr in cust_rows.iterrows():
@@ -51,6 +65,7 @@ def to_canonical(nbim_df: pd.DataFrame, custody_df: pd.DataFrame) -> List[Canoni
                 CustodyLeg(
                     bank_account=str(cr.get("BANK_ACCOUNTS") or cr.get("CUSTODY") or ""),
                     shares=_safe_float(cr.get("HOLDING_QUANTITY", cr.get("NOMINAL_BASIS", 0))),
+                    loan_quantity=_safe_float(cr.get("LOAN_QUANTITY", 0)),
                     gross_qc=_safe_float(cr.get("GROSS_AMOUNT", 0)),
                     net_qc=_safe_float(cr.get("NET_AMOUNT_QC", cr.get("NET_AMOUNT_SC", 0))),
                     tax_qc=_safe_float(cr.get("TAX", 0)),
