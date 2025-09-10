@@ -1,0 +1,4 @@
+event_id,isin,ex_date,pay_date,q_ccy,s_ccy,amount_delta_qc,amount_delta_sc,fx_delta,wht_rate_delta_pp,pay_date_offset_days,shares_delta,shares_delta_after_loan,risk_score,require_review,auto_close,break_types,severity,confidence
+950123456,US0378331005,07.02.2025,14.02.2025,USD,USD,0.0,0.0,0.0,0.0,0,0.0,0.0,0.0,False,True,No_break_detected,low,0.3
+960789012,KR7005930003,31.03.2025,20.05.2025,KRW,USD,450050.0,342.77000000000044,-2.3319430441336164e-07,-2.0,5,-2000.0,0.0,0.67,False,False,"Tax_rate_mismatch,Timing_mismatch",low,0.6
+970456789,CH0038863350,25.04.2025,29.04.2025,CHF,CHF,4030.0,4030.0,0.0,0.0,0,2000.0,2000.0,3.0,True,False,Quantity_mismatch,medium,0.55

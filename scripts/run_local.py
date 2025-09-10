@@ -1,10 +1,12 @@
 """
-Entry script: run reconciliation, print summaries, and (optionally) export JSON artifacts.
+Entry script: run reconciliation, print summaries, optionally export JSON artifacts,
+and optionally write a one-row-per-event summary CSV.
 
 Usage:
     python scripts/run_local.py
-    python scripts/run_local.py --out artifacts/    # writes one JSON per event into 'artifacts/'
-    python scripts/run_local.py --nbim path/to/NBIM.csv --custody path/to/CUSTODY.csv --out outdir/
+    python scripts/run_local.py --out artifacts/
+    python scripts/run_local.py --summary-csv summary.csv
+    python scripts/run_local.py --nbim NBIM.csv --custody CUSTODY.csv --out artifacts --summary-csv summary.csv
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Optional
+from typing import Optional, List, Dict
 
 # Ensure src/ is on sys.path
 here = os.path.dirname(os.path.abspath(__file__))
@@ -25,11 +27,12 @@ from recon.attribution import per_account_attribution
 from recon.policy import risk_and_policy
 from recon.classify import classify
 from recon.export import build_event_payload, write_event_json
+from recon.summary import build_summary_dataframe
 
 
 def _parse_args() -> argparse.Namespace:
     """
-    Parse CLI arguments for flexible input paths and optional export directory.
+    Parse CLI arguments for flexible input paths and optional exports.
     """
     p = argparse.ArgumentParser(description="NBIM dividend reconciliation runner")
     p.add_argument(
@@ -50,6 +53,13 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="If set, directory to write one JSON file per event",
     )
+    p.add_argument(
+        "--summary-csv",
+        type=str,
+        default=None,
+        help="If set, path to write a one-row-per-event CSV summary. "
+             "If you pass just 'summary.csv' and also set --out, it will be placed inside --out.",
+    )
     return p.parse_args()
 
 
@@ -63,16 +73,20 @@ def _ensure_dir(path: str) -> None:
 def main() -> None:
     """
     Load CSVs, run reconciliation, print numeric summary, risk flags, classification,
-    and an audit paragraph per event with embedded per-account evidence. Optionally export JSON.
+    and an audit paragraph per event with embedded per-account evidence.
+    Optionally export JSON per event and a single summary CSV.
     """
     args = _parse_args()
 
     events, diffs = run(args.nbim, args.custody)
 
-    # Export directory preparation (if requested)
     export_dir: Optional[str] = args.out
     if export_dir:
         _ensure_dir(export_dir)
+
+    # Keep per-event artifacts so we can build the summary CSV at the end
+    risks: List[Dict[str, object]] = []
+    classes: List[Dict[str, object]] = []
 
     for ev, d in zip(events, diffs):
         # Aggregate numeric one-liner
@@ -85,10 +99,12 @@ def main() -> None:
 
         # Risk flags
         rp = risk_and_policy(ev, d, cfg=None)
+        risks.append(rp)
         print(f"Risk: score={rp['risk_score']:.2f} | require_review={rp['require_review']} | auto_close={rp['auto_close']}")
 
         # Deterministic classification
         cls = classify(d)
+        classes.append(cls)
         print(
             "Classify:",
             f"types={cls['break_types']}",
@@ -118,7 +134,7 @@ def main() -> None:
                     f"(NBIM shares={r['nbim_shares']:.0f}, Custody shares={r['custody_shares']:.0f})"
                 )
 
-        # Export if requested
+        # Export per-event JSON if requested
         if export_dir:
             payload = build_event_payload(
                 event=ev,
@@ -132,6 +148,17 @@ def main() -> None:
             write_event_json(out_path, payload)
 
         print("-" * 80)
+
+    # Build summary CSV if requested
+    if args.summary_csv:
+        # If the user passed just "summary.csv" and also set --out, put it inside that folder
+        out_path = args.summary_csv
+        if args.summary_csv == "summary.csv" and export_dir:
+            out_path = os.path.join(export_dir, "summary.csv")
+
+        df = build_summary_dataframe(events, diffs, risks, classes)
+        df.to_csv(out_path, index=False)
+        print(f"Summary written to: {out_path}")
 
 
 if __name__ == "__main__":
