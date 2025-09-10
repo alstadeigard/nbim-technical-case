@@ -97,8 +97,7 @@ def classify_llm(
                 data = json.loads(cached or "{}")
                 out = _ClassifyOut.model_validate(data)
                 result = {
-                    "break_types": out.break_types or ["Amount_delta_unexplained"]
-                        if abs(diff.amount_delta_sc) > 0 else ["No_break_detected"],
+                    "break_types": out.break_types or (["Amount_delta_unexplained"] if abs(diff.amount_delta_sc) > 0 else ["No_break_detected"]),
                     "severity": out.severity,
                     "hypothesized_causes": out.hypothesized_causes,
                     "confidence": round(float(out.confidence), 2),
@@ -120,7 +119,7 @@ def classify_llm(
                     )
                 return result
             except Exception:
-                pass  # fall through to non-cached path
+                pass
 
         est_in = llm_budget.estimate_tokens_from_text(msgs["system"]) + llm_budget.estimate_tokens_from_text(msgs["user"])
         est_out = 300
@@ -155,8 +154,7 @@ def classify_llm(
         out = _ClassifyOut.model_validate(data)
 
         result = {
-            "break_types": out.break_types or ["Amount_delta_unexplained"]
-                if abs(diff.amount_delta_sc) > 0 else ["No_break_detected"],
+            "break_types": out.break_types or (["Amount_delta_unexplained"] if abs(diff.amount_delta_sc) > 0 else ["No_break_detected"]),
             "severity": out.severity,
             "hypothesized_causes": out.hypothesized_causes,
             "confidence": round(float(out.confidence), 2),

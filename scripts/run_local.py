@@ -5,6 +5,7 @@ Usage:
     python scripts/run_local.py
     python scripts/run_local.py --out artifacts --summary-csv summary.csv
     python scripts/run_local.py --config config.yaml --use-llm --llm-provider openai --llm-model gpt-4o-mini --out artifacts --summary-csv summary.csv
+    python scripts/run_local.py --log-redact  # redacts LLM prompts/responses and audit_text in logs
 """
 
 from __future__ import annotations
@@ -46,6 +47,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--use-llm", action="store_true", help="Use LLM-backed classification.")
     p.add_argument("--llm-provider", type=str, default=None, help="openai | anthropic")
     p.add_argument("--llm-model", type=str, default=None, help="Model name, e.g., gpt-4o-mini")
+    p.add_argument("--log-redact", action="store_true", help="Redact LLM prompts/responses in logs.")
     return p.parse_args()
 
 
@@ -57,7 +59,10 @@ def main() -> None:
     args = _parse_args()
     cfg = load_config(args.config if args.config else None)
 
-    run_logger = RunLogger()
+    if args.log_redact:
+        os.environ["LOG_REDACT"] = "1"
+
+    run_logger = RunLogger(redact=args.log_redact)
     run_logger.log_run_start(
         {
             "nbim": args.nbim,
@@ -68,6 +73,7 @@ def main() -> None:
             "use_llm": bool(args.use_llm),
             "llm_provider": args.llm_provider or "openai",
             "llm_model": args.llm_model or "gpt-4o-mini",
+            "log_redact": bool(args.log_redact),
         }
     )
 

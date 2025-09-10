@@ -1,17 +1,3 @@
-risk:
-  weights:
-    amount_delta_qc: 0.0005
-    amount_delta_sc: 0.005
-    shares_delta_after_loan: 0.001
-    wht_rate_delta_pp: 0.25
-    fx_delta_abs: 1.0
-    pay_date_offset_days: 0.2
-  thresholds:
-    review_score: 1.0
-    auto_close_score: 0.2
-  caps:
-    max_score: 5.0
-
 formatting:
   rounding:
     amounts_dp: 2
