@@ -1,5 +1,6 @@
 """
-Entry script: run reconciliation, print summaries, and include per-account evidence in the audit text.
+Entry script: run reconciliation, print summaries, policy flags, classification,
+and include per-account evidence in the audit text.
 """
 
 import os
@@ -14,12 +15,13 @@ from recon.orchestrator import run
 from recon.audit import generate_audit_paragraph
 from recon.attribution import per_account_attribution
 from recon.policy import risk_and_policy
+from recon.classify import classify
 
 
 def main() -> None:
     """
-    Load CSVs, run reconciliation, print numeric summary and audit paragraph per event,
-    including per-account evidence lines within the paragraph.
+    Load CSVs, run reconciliation, print numeric summary, risk flags, classification,
+    and an audit paragraph per event with embedded per-account evidence.
     """
     nbim_path = os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv")
     custody_path = os.path.join(root, "data", "CUSTODY_Dividend_Bookings 1.csv")
@@ -39,13 +41,22 @@ def main() -> None:
         rp = risk_and_policy(ev, d, cfg=None)
         print(f"Risk: score={rp['risk_score']:.2f} | require_review={rp['require_review']} | auto_close={rp['auto_close']}")
 
-        # Per-account rows (used both for printing and to embed in audit text)
+        # Deterministic classification
+        cls = classify(d)
+        print(
+            "Classify:",
+            f"types={cls['break_types']}",
+            f"severity={cls['severity']}",
+            f"confidence={cls['confidence']}",
+        )
+
+        # Per-account rows (used for evidence)
         rows = per_account_attribution(ev)
 
-        # Single, portable audit paragraph with embedded account evidence lines
+        # Single audit paragraph with embedded account evidence lines
         print(generate_audit_paragraph(ev, d, account_rows=rows))
 
-        # Also print a compact per-account table if there are interesting deltas
+        # Optional compact per-account table when interesting
         interesting = [
             r for r in rows
             if abs(r["share_delta"]) > 0.0 or abs(r["net_qc_delta"]) > 0.0 or abs(r["net_sc_delta"]) > 0.0
