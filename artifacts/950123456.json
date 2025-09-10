@@ -63,9 +63,9 @@
   "per_account": [
     {
       "bank_account": "501234567",
-      "nbim_shares": 1500000.0,
-      "custody_shares": 1500000.0,
-      "share_delta": 0.0,
+      "nbim_shares": 1500000,
+      "custody_shares": 1500000,
+      "share_delta": 0,
       "nbim_net_qc": 318750.0,
       "custody_net_qc": 318750.0,
       "net_qc_delta": 0.0,
@@ -74,5 +74,10 @@
       "net_sc_delta": 0.0
     }
   ],
-  "audit_text": "Event 950123456 (ISIN US0378331005, USD→USD) reconciliation summary: No amount deltas detected. No share delta after lending adjustment. No implied FX difference. No withholding tax rate difference."
+  "audit_text": "Event 950123456 (ISIN US0378331005, USD→USD) reconciliation summary: No amount deltas detected. No share delta after lending adjustment. No implied FX difference. No withholding tax rate difference.",
+  "remediation": {
+    "actions": [
+      "[P3] No break to remediate for US0378331005; auto-close per policy if permitted."
+    ]
+  }
 }

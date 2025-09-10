@@ -59,8 +59,10 @@ def _parse_args() -> argparse.Namespace:
         "--summary-csv",
         type=str,
         default=None,
-        help="If set, path to write a one-row-per-event CSV summary. "
-             "If you pass just 'summary.csv' and also set --out, it will be placed inside --out.",
+        help=(
+            "If set, path to write a one-row-per-event CSV summary. "
+            "If you pass just 'summary.csv' and also set --out, it will be placed inside --out."
+        ),
     )
     p.add_argument(
         "--use-llm",
@@ -99,7 +101,6 @@ def main() -> None:
     classes: List[Dict[str, object]] = []
 
     for ev, d in zip(events, diffs):
-        # Numeric one-liner
         print(
             f"{ev.event_id} | QCΔ={d.amount_delta_qc:.2f} | SCΔ={d.amount_delta_sc:.2f} "
             f"| WHTΔ={d.wht_rate_delta:.2f}pp | FXΔ={d.fx_delta:.6f} "
@@ -107,12 +108,10 @@ def main() -> None:
             f"| LoanΣ={d.loan_total:.2f} | SharesΔ(loan-adj)={d.share_diff_after_loan:.2f}"
         )
 
-        # Risk
         rp = risk_and_policy(ev, d, cfg=None)
         risks.append(rp)
         print(f"Risk: score={rp['risk_score']:.2f} | require_review={rp['require_review']} | auto_close={rp['auto_close']}")
 
-        # Classification (LLM or rules)
         rows = per_account_attribution(ev)
         if args.use_llm:
             cls = classify_llm(
@@ -127,25 +126,21 @@ def main() -> None:
             cls = classify_rules(d)
             source = "rules"
         classes.append(cls)
-        print(
-            f"Classify[{source}]: types={cls['break_types']} severity={cls['severity']} confidence={cls['confidence']}"
-        )
+        print(f"Classify[{source}]: types={cls['break_types']} severity={cls['severity']} confidence={cls['confidence']}")
+
         causes = cls.get("hypothesized_causes") or []
         if causes:
             print("Causes:", "; ".join(str(c) for c in causes))
 
-        # Remediation suggestions
         actions = suggest_remediation(event=ev, diff=d, classification=cls, per_account_rows=rows, risk=rp)
         if actions:
             print("Next actions:")
             for a in actions:
                 print(f"  - {a}")
 
-        # Audit
         audit_text = generate_audit_paragraph(ev, d, account_rows=rows)
         print(audit_text)
 
-        # Per-account evidence table (only when interesting)
         interesting = [
             r for r in rows
             if abs(r["share_delta"]) > 0.0 or abs(r["net_qc_delta"]) > 0.0 or abs(r["net_sc_delta"]) > 0.0
@@ -160,7 +155,6 @@ def main() -> None:
                     f"(NBIM shares={r['nbim_shares']:.0f}, Custody shares={r['custody_shares']:.0f})"
                 )
 
-        # Export JSON if requested
         if export_dir:
             payload = build_event_payload(
                 event=ev,
@@ -169,13 +163,13 @@ def main() -> None:
                 risk=rp,
                 per_account_rows=rows,
                 audit_text=audit_text,
+                actions=actions,
             )
             out_path = os.path.join(export_dir, f"{ev.event_id}.json")
             write_event_json(out_path, payload)
 
         print("-" * 80)
 
-    # Summary CSV
     if args.summary_csv:
         out_path = args.summary_csv
         if args.summary_csv == "summary.csv" and export_dir:

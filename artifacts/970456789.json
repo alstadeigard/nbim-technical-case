@@ -101,9 +101,9 @@
   "per_account": [
     {
       "bank_account": "823456789",
-      "nbim_shares": 20000.0,
-      "custody_shares": 20000.0,
-      "share_delta": 0.0,
+      "nbim_shares": 20000,
+      "custody_shares": 20000,
+      "share_delta": 0,
       "nbim_net_qc": 40300.0,
       "custody_net_qc": 40300.0,
       "net_qc_delta": 0.0,
@@ -113,9 +113,9 @@
     },
     {
       "bank_account": "823456790",
-      "nbim_shares": 15000.0,
-      "custody_shares": 15000.0,
-      "share_delta": 0.0,
+      "nbim_shares": 15000,
+      "custody_shares": 15000,
+      "share_delta": 0,
       "nbim_net_qc": 30225.0,
       "custody_net_qc": 30225.0,
       "net_qc_delta": 0.0,
@@ -125,9 +125,9 @@
     },
     {
       "bank_account": "823456791",
-      "nbim_shares": 10000.0,
-      "custody_shares": 12000.0,
-      "share_delta": 2000.0,
+      "nbim_shares": 10000,
+      "custody_shares": 12000,
+      "share_delta": 2000,
       "nbim_net_qc": 20150.0,
       "custody_net_qc": 24180.0,
       "net_qc_delta": 4030.0,
@@ -136,5 +136,12 @@
       "net_sc_delta": 4030.0
     }
   ],
-  "audit_text": "Event 970456789 (ISIN CH0038863350, CHF→CHF) reconciliation summary: Amount delta in quotation currency: 4,030.00. Amount delta in settlement currency: 4,030.00. Share delta of 2,000 (loan-adjusted 2,000); loan total 0. No implied FX difference. No withholding tax rate difference. Evidence by account: [823456791] SharesΔ=2,000, QCΔ=4,030.00, SCΔ=4,030.00"
+  "audit_text": "Event 970456789 (ISIN CH0038863350, CHF→CHF) reconciliation summary: Amount delta in quotation currency: 4,030.00. Amount delta in settlement currency: 4,030.00. Share delta of 2,000 (loan-adjusted 2,000); loan total 0. No implied FX difference. No withholding tax rate difference. Evidence by account: [823456791] SharesΔ=2,000, QCΔ=4,030.00, SCΔ=4,030.00",
+  "remediation": {
+    "actions": [
+      "[P1] Verify positions vs. custody for CH0038863350: reconcile NBIM shares (45000) with custody total; investigate loans/recalls and corporate actions. Evidence: 823456791 (SharesΔ=2000, QCΔ=4030.00, SCΔ=4030.00)",
+      "[P1] Check latest share movements around EX/PAY dates (fails/late receipts). Confirm lending records and recalls cover 0 shares.",
+      "[P1] Trace amount delta for CH0038863350: recompute gross→net with tax/fees; confirm fee buckets (ADR/local charges) and rounding rules in both systems."
+    ]
+  }
 }
