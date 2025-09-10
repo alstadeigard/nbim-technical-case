@@ -1,5 +1,6 @@
 """
-Entry script: run reconciliation and print both aggregate and per-account attributions.
+Entry script: run reconciliation, print aggregate & per-account attribution,
+and include deterministic risk flags.
 """
 
 import os
@@ -13,17 +14,19 @@ sys.path.insert(0, os.path.join(root, "src"))
 from recon.orchestrator import run
 from recon.audit import generate_audit_paragraph
 from recon.attribution import per_account_attribution
+from recon.policy import risk_and_policy
 
 
 def main() -> None:
     """
     Load CSVs, run reconciliation, print numeric summary and audit paragraph per event,
-    then print per-account attribution when useful.
+    then print per-account attribution and risk flags.
     """
     nbim_path = os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv")
     custody_path = os.path.join(root, "data", "CUSTODY_Dividend_Bookings 1.csv")
 
     events, diffs = run(nbim_path, custody_path)
+
     for ev, d in zip(events, diffs):
         # Aggregate numeric one-liner
         print(
@@ -32,10 +35,15 @@ def main() -> None:
             f"| PayΔ={d.date_offset_pay_abs_days}d | SharesΔ={d.share_diff:.2f} "
             f"| LoanΣ={d.loan_total:.2f} | SharesΔ(loan-adj)={d.share_diff_after_loan:.2f}"
         )
+
+        # Deterministic risk flags
+        rp = risk_and_policy(ev, d, cfg=None)
+        print(f"Risk: score={rp['risk_score']:.2f} | require_review={rp['require_review']} | auto_close={rp['auto_close']}")
+
         # Aggregate audit paragraph
         print(generate_audit_paragraph(ev, d))
 
-        # Per-account attribution for visibility (only print if any non-zero deltas)
+        # Per-account attribution (only if any non-zero deltas)
         rows = per_account_attribution(ev)
         interesting = [
             r for r in rows
