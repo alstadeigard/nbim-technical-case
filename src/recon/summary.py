@@ -1,9 +1,8 @@
 """
 Summary CSV builder for reconciliation results.
 
-This module produces a tidy, one-row-per-event summary suitable for quick review
-or spreadsheet analysis. It expects the already-computed artifacts per event:
-DiffRecord, risk/policy dict, and classification dict.
+Produces a tidy, one-row-per-event summary and applies sensible rounding so the CSV
+is easy to read (no scientific notation, consistent decimal places).
 """
 
 from __future__ import annotations
@@ -36,19 +35,19 @@ def _row(
         "pay_date": event.pay_date,
         "q_ccy": event.quotation_ccy,
         "s_ccy": event.settlement_ccy,
-        "amount_delta_qc": diff.amount_delta_qc,
-        "amount_delta_sc": diff.amount_delta_sc,
-        "fx_delta": diff.fx_delta,
-        "wht_rate_delta_pp": diff.wht_rate_delta,
-        "pay_date_offset_days": diff.date_offset_pay_abs_days,
-        "shares_delta": diff.share_diff,
-        "shares_delta_after_loan": diff.share_diff_after_loan,
-        "risk_score": risk.get("risk_score"),
-        "require_review": risk.get("require_review"),
-        "auto_close": risk.get("auto_close"),
+        "amount_delta_qc": float(diff.amount_delta_qc),
+        "amount_delta_sc": float(diff.amount_delta_sc),
+        "fx_delta": float(diff.fx_delta),
+        "wht_rate_delta_pp": float(diff.wht_rate_delta),
+        "pay_date_offset_days": int(diff.date_offset_pay_abs_days),
+        "shares_delta": float(diff.share_diff),
+        "shares_delta_after_loan": float(diff.share_diff_after_loan),
+        "risk_score": float(risk.get("risk_score", 0.0)),
+        "require_review": bool(risk.get("require_review", False)),
+        "auto_close": bool(risk.get("auto_close", False)),
         "break_types": break_types_str,
-        "severity": classification.get("severity"),
-        "confidence": classification.get("confidence"),
+        "severity": str(classification.get("severity")),
+        "confidence": float(classification.get("confidence", 0.0)),
     }
 
 
@@ -59,12 +58,22 @@ def build_summary_dataframe(
     classes: List[Dict[str, object]],
 ) -> pd.DataFrame:
     """
-    Build a pandas DataFrame with one row per event from the provided artifacts.
+    Build a pandas DataFrame with one row per event and apply consistent rounding.
+
+    Rounding policy:
+      - Money deltas (QC/SC): 2 decimals
+      - FX delta: 6 decimals
+      - WHT delta (pp): 2 decimals
+      - Shares deltas: integer
+      - Risk score & confidence: 2 decimals
+      - Day offsets: integer
     """
     rows: List[Dict[str, object]] = []
     for ev, d, rp, cls in zip(events, diffs, risks, classes):
         rows.append(_row(ev, d, rp, cls))
+
     df = pd.DataFrame(rows)
+
     # Stable column order for readability
     cols = [
         "event_id", "isin", "ex_date", "pay_date", "q_ccy", "s_ccy",
@@ -73,4 +82,29 @@ def build_summary_dataframe(
         "risk_score", "require_review", "auto_close",
         "break_types", "severity", "confidence",
     ]
-    return df[cols]
+    df = df[cols]
+
+    # Apply rounding/casting
+    round_map = {
+        "amount_delta_qc": 2,
+        "amount_delta_sc": 2,
+        "fx_delta": 6,
+        "wht_rate_delta_pp": 2,
+        "risk_score": 2,
+        "confidence": 2,
+    }
+    df = df.copy()
+
+    for col, ndp in round_map.items():
+        if col in df.columns:
+            df[col] = df[col].round(ndp)
+
+    # Shares and day offsets as integers
+    if "shares_delta" in df.columns:
+        df["shares_delta"] = df["shares_delta"].round(0).astype(int)
+    if "shares_delta_after_loan" in df.columns:
+        df["shares_delta_after_loan"] = df["shares_delta_after_loan"].round(0).astype(int)
+    if "pay_date_offset_days" in df.columns:
+        df["pay_date_offset_days"] = df["pay_date_offset_days"].astype(int)
+
+    return df
