@@ -32,6 +32,56 @@ from recon.runlog import RunLogger
 from recon.config import load_config
 
 
+# ----------------------- ASCII-safe console output -----------------------------
+
+_ASCII_MAP = str.maketrans({
+    "Δ": "d",
+    "Σ": "Sum",
+    "→": "->",
+    "–": "-",
+    "—": "-",
+    "’": "'",
+    "‘": "'",
+    "“": '"',
+    "”": '"',
+    "•": "*",
+    "·": "-",
+    "±": "+/-",
+    " ": " ",   # narrow no-break space
+    "\u00a0": " ",  # nbsp
+})
+
+
+def _asciify(text: str) -> str:
+    """
+    Convert a string to something safe for Windows consoles that may not
+    support UTF-8, replacing common Unicode punctuation/symbols with ASCII.
+    """
+    try:
+        return text.translate(_ASCII_MAP)
+    except Exception:
+        # Last-resort: replace non-ascii with '?'
+        try:
+            return text.encode("ascii", "replace").decode("ascii")
+        except Exception:
+            return text
+
+
+def _print(line: str) -> None:
+    """
+    Print with ASCII normalization to avoid UnicodeEncodeError on Windows.
+    """
+    try:
+        print(_asciify(line))
+    except Exception:
+        # Fallback if the console is really hostile
+        sys.stdout.write(_asciify(line) + os.linesep)
+        sys.stdout.flush()
+
+
+# ------------------------------------------------------------------------------
+
+
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="NBIM dividend reconciliation runner")
     p.add_argument("--nbim", type=str, default=os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv"))
@@ -87,16 +137,17 @@ def main() -> None:
     classes: List[Dict[str, object]] = []
 
     for ev, d in zip(events, diffs):
-        print(
-            f"{ev.event_id} | QCΔ={d.amount_delta_qc:.2f} | SCΔ={d.amount_delta_sc:.2f} "
-            f"| WHTΔ={d.wht_rate_delta:.2f}pp | FXΔ={d.fx_delta:.6f} "
-            f"| PayΔ={d.date_offset_pay_abs_days}d | SharesΔ={d.share_diff:.2f} "
-            f"| LoanΣ={d.loan_total:.2f} | SharesΔ(loan-adj)={d.share_diff_after_loan:.2f}"
+        # ASCII-safe, no Unicode symbols
+        _print(
+            f"{ev.event_id} | QCd={d.amount_delta_qc:.2f} | SCd={d.amount_delta_sc:.2f} "
+            f"| WHTd(pp)={d.wht_rate_delta:.2f} | FXd={d.fx_delta:.6f} "
+            f"| Payd={d.date_offset_pay_abs_days}d | Sharesd={d.share_diff:.2f} "
+            f"| LoanSum={d.loan_total:.2f} | Sharesd(loan-adj)={d.share_diff_after_loan:.2f}"
         )
 
-        rp = risk_and_policy(ev, d, cfg=cfg)
+        rp = risk_and_policy(ev, d)
         risks.append(rp)
-        print(f"Risk: score={rp['risk_score']:.2f} | require_review={rp['require_review']} | auto_close={rp['auto_close']}")
+        _print(f"Risk: score={rp['risk_score']:.2f} | require_review={rp['require_review']} | auto_close={rp['auto_close']}")
 
         rows = per_account_attribution(ev)
         if args.use_llm:
@@ -113,32 +164,32 @@ def main() -> None:
             cls = classify_rules(d)
             source = "rules"
         classes.append(cls)
-        print(f"Classify[{source}]: types={cls['break_types']} severity={cls['severity']} confidence={cls['confidence']}")
+        _print(f"Classify[{source}]: types={cls['break_types']} severity={cls['severity']} confidence={cls['confidence']}")
 
         causes = cls.get("hypothesized_causes") or []
         if causes:
-            print("Causes:", "; ".join(str(c) for c in causes))
+            _print("Causes: " + "; ".join(str(c) for c in causes))
 
         actions = suggest_remediation(event=ev, diff=d, classification=cls, per_account_rows=rows, risk=rp)
         if actions:
-            print("Next actions:")
+            _print("Next actions:")
             for a in actions:
-                print(f"  - {a}")
+                _print(f"  - {a}")
 
         audit_text = generate_audit_paragraph(ev, d, account_rows=rows)
-        print(audit_text)
+        _print(audit_text)
 
         interesting = [
             r for r in rows
             if abs(r["share_delta"]) > 0.0 or abs(r["net_qc_delta"]) > 0.0 or abs(r["net_sc_delta"]) > 0.0
         ]
         if interesting:
-            print("Per-account attribution:")
+            _print("Per-account attribution:")
             for r in rows:
                 acct = r["bank_account"] or "(blank)"
-                print(
-                    f"  - {acct}: SharesΔ={r['share_delta']:.0f}, "
-                    f"QCΔ={r['net_qc_delta']:.2f}, SCΔ={r['net_sc_delta']:.2f} "
+                _print(
+                    f"  - {acct}: Sharesd={r['share_delta']:.0f}, "
+                    f"QCd={r['net_qc_delta']:.2f}, SCd={r['net_sc_delta']:.2f} "
                     f"(NBIM shares={r['nbim_shares']:.0f}, Custody shares={r['custody_shares']:.0f})"
                 )
 
@@ -183,7 +234,7 @@ def main() -> None:
             out_path = os.path.join(export_dir, f"{ev.event_id}.json")
             write_event_json(out_path, payload)
 
-        print("-" * 80)
+        _print("-" * 80)
 
     if args.summary_csv:
         out_path = args.summary_csv
@@ -191,7 +242,7 @@ def main() -> None:
             out_path = os.path.join(export_dir, "summary.csv")
         df = build_summary_dataframe(events, diffs, risks, classes)
         df.to_csv(out_path, index=False)
-        print(f"Summary written to: {out_path}")
+        _print(f"Summary written to: {out_path}")
 
 
 if __name__ == "__main__":
