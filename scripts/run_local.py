@@ -30,6 +30,7 @@ from recon.attribution import per_account_attribution
 from recon.policy import risk_and_policy
 from recon.classify import classify as classify_rules
 from recon.classify_llm import classify_llm
+from recon.remediation import suggest_remediation
 from recon.export import build_event_payload, write_event_json
 from recon.summary import build_summary_dataframe
 
@@ -129,16 +130,22 @@ def main() -> None:
         print(
             f"Classify[{source}]: types={cls['break_types']} severity={cls['severity']} confidence={cls['confidence']}"
         )
-        # NEW: surface LLM hypothesized causes (or rules fallback)
         causes = cls.get("hypothesized_causes") or []
         if causes:
             print("Causes:", "; ".join(str(c) for c in causes))
+
+        # Remediation suggestions
+        actions = suggest_remediation(event=ev, diff=d, classification=cls, per_account_rows=rows, risk=rp)
+        if actions:
+            print("Next actions:")
+            for a in actions:
+                print(f"  - {a}")
 
         # Audit
         audit_text = generate_audit_paragraph(ev, d, account_rows=rows)
         print(audit_text)
 
-        # Per-account table (only when interesting)
+        # Per-account evidence table (only when interesting)
         interesting = [
             r for r in rows
             if abs(r["share_delta"]) > 0.0 or abs(r["net_qc_delta"]) > 0.0 or abs(r["net_sc_delta"]) > 0.0
