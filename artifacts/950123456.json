@@ -74,7 +74,7 @@
       "net_sc_delta": 0.0
     }
   ],
-  "audit_text": "Event 950123456 (ISIN US0378331005, USD→USD) reconciliation summary: No amount deltas detected. No share delta after lending adjustment. No implied FX difference. No withholding tax rate difference.",
+  "audit_text": "Event 950123456 (ISIN US0378331005, USD->USD) reconciliation summary: No amount delta in quotation currency. No amount delta in settlement currency. No share delta after lending adjustment; loan total: 0. No implied FX difference. No withholding tax rate difference.",
   "remediation": {
     "actions": [
       "[P3] No break to remediate for US0378331005; auto-close per policy if permitted."

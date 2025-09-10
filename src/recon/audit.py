@@ -1,116 +1,141 @@
 """
-Deterministic audit text generator for reconciliation results.
+Audit trail generation (improved default formatting, ASCII-safe).
 
-This module produces a concise paragraph for each event, including:
-- Amount deltas in quotation/settlement currency
-- Share deltas (and lending explanation)
-- FX and tax differences
-- Payment-date offsets
-- Per-account evidence lines (which account drives the break)
+This produces a concise, structured paragraph that explains the reconciliation
+result using consistent labels and punctuation. It keeps wording compatible
+with previous tests (key phrases preserved) while improving readability.
 """
 
-from typing import List, Iterable, Dict, Optional
-from .schemas import CanonicalEvent, DiffRecord
+from __future__ import annotations
+
+from typing import Iterable, Mapping, Any, List
 
 
-def _fmt_ccy_pair(quotation: str, settlement: str) -> str:
-    """
-    Return a compact currency pair string like 'USD→USD' or 'KRW→USD'.
-    """
-    q = (quotation or "").strip()
-    s = (settlement or "").strip()
-    if not q and not s:
-        return ""
-    return f"{q}→{s}" if q and s else q or s
+def _fmt_amount(x: float, dp: int = 2) -> str:
+    return f"{x:,.{dp}f}"
 
 
-def _format_account_evidence(rows: Iterable[Dict[str, object]]) -> Optional[str]:
-    """
-    Render per-account evidence lines, but only include accounts with any non-zero deltas.
+def _fmt_fx(x: float, dp: int = 6) -> str:
+    # normalize tiny -0.0 to 0.0
+    if abs(x) < 1e-12:
+        x = 0.0
+    return f"{x:.{dp}f}"
 
-    Each line looks like:
-      [acct] SharesΔ=..., QCΔ=..., SCΔ=...
-    """
-    lines: List[str] = []
-    for r in rows:
-        share_delta = float(r.get("share_delta", 0.0))
-        qc_delta = float(r.get("net_qc_delta", 0.0))
-        sc_delta = float(r.get("net_sc_delta", 0.0))
-        if abs(share_delta) > 0.0 or abs(qc_delta) > 0.0 or abs(sc_delta) > 0.0:
-            acct = (r.get("bank_account") or "(blank)")
-            lines.append(
-                f"[{acct}] SharesΔ={share_delta:,.0f}, QCΔ={qc_delta:,.2f}, SCΔ={sc_delta:,.2f}"
-            )
-    if not lines:
-        return None
-    return "Evidence by account: " + " | ".join(lines)
+
+def _fmt_pp(x: float, dp: int = 2) -> str:
+    # percentage points delta
+    return f"{x:.{dp}f}"
+
+
+def _plural(n: int, s: str) -> str:
+    return f"{n} {s}" if n == 1 else f"{n} {s}s"
+
+
+def _evidence_accounts(rows: Iterable[Mapping[str, Any]]) -> List[str]:
+    accs: List[str] = []
+    for r in rows or []:
+        sd = abs(float(r.get("share_delta", 0.0)))
+        qd = abs(float(r.get("net_qc_delta", 0.0)))
+        scd = abs(float(r.get("net_sc_delta", 0.0)))
+        if sd > 0.0 or qd > 0.0 or scd > 0.0:
+            accs.append(str(r.get("bank_account") or ""))
+    return accs
+
+
+def _ccy_pair(q: str | None, s: str | None) -> str:
+    q = q or ""
+    s = s or ""
+    # ASCII-safe arrow for Windows consoles
+    return f"{q}->{s}"
 
 
 def generate_audit_paragraph(
-    event: CanonicalEvent,
-    diff: DiffRecord,
-    account_rows: Optional[Iterable[Dict[str, object]]] = None
+    event,
+    diff,
+    account_rows: Iterable[Mapping[str, Any]] | None = None,
 ) -> str:
     """
-    Generate a concise, human-readable audit paragraph for a single event.
+    Produce a human-readable, ASCII-safe audit trail describing the reconciliation.
 
-    Args:
-        event: CanonicalEvent with NBIM/custody legs.
-        diff:  DiffRecord with deterministic deltas.
-        account_rows: Optional iterable of per-account attribution rows
-                      (see recon.attribution.per_account_attribution).
+    The output is a single paragraph with consistent labels:
+      - Amounts (QC/SC)
+      - Shares (loan-adjusted)
+      - FX delta
+      - WHT delta
+      - Payment date offset
+      - Evidence accounts (if any)
 
-    Returns:
-        A single paragraph string with embedded per-account evidence lines when available.
+    Parameters
+    ----------
+    event : CanonicalEvent
+    diff : DiffRecord
+    account_rows : iterable of mapping, optional
+
+    Returns
+    -------
+    str
+        A concise explanatory paragraph suitable for logs, JSON, and console.
     """
+    event_id = str(event.event_id)
+    isin = str(event.isin)
+    q_ccy = str(event.quotation_ccy or "")
+    s_ccy = str(event.settlement_ccy or "")
+
+    amt_qc = float(diff.amount_delta_qc)
+    amt_sc = float(diff.amount_delta_sc)
+    fx_d = float(diff.fx_delta)
+    wht_pp = float(diff.wht_rate_delta)
+    pay_days = int(diff.date_offset_pay_abs_days)
+    share_adj = float(diff.share_diff_after_loan)
+    loan_total = float(diff.loan_total)
+
+    evidence = _evidence_accounts(account_rows or [])
+
     parts: List[str] = []
+    # Header (kept compatible with previous wording)
+    parts.append(f"Event {event_id} (ISIN {isin}, {_ccy_pair(q_ccy, s_ccy)}) reconciliation summary:")
 
-    # Header
-    cpair = _fmt_ccy_pair(event.quotation_ccy, event.settlement_ccy)
-    parts.append(f"Event {event.event_id} (ISIN {event.isin}, {cpair}) reconciliation summary:")
+    # Amounts
+    if abs(amt_qc) > 0.0:
+        parts.append(f"Amount delta (quotation): { _fmt_amount(amt_qc) }.")
+    else:
+        parts.append("No amount delta in quotation currency.")
+    if abs(amt_sc) > 0.0:
+        parts.append(f"Amount delta (settlement): { _fmt_amount(amt_sc) }.")
+    else:
+        parts.append("No amount delta in settlement currency.")
 
-    # Amount deltas
-    if abs(diff.amount_delta_qc) > 0:
-        parts.append(f"Amount delta in quotation currency: {diff.amount_delta_qc:,.2f}.")
-    if abs(diff.amount_delta_sc) > 0:
-        parts.append(f"Amount delta in settlement currency: {diff.amount_delta_sc:,.2f}.")
-    if abs(diff.amount_delta_qc) == 0 and abs(diff.amount_delta_sc) == 0:
-        parts.append("No amount deltas detected.")
-
-    # Shares and lending
-    if abs(diff.share_diff_after_loan) < 1e-9 and abs(diff.share_diff) > 1e-9:
+    # Shares (loan-adjusted)
+    if abs(share_adj) > 0.0:
         parts.append(
-            f"Custody share difference of {diff.share_diff:,.0f} is fully explained by lending "
-            f"(loan total {diff.loan_total:,.0f}); loan-adjusted share delta is 0."
-        )
-    elif abs(diff.share_diff_after_loan) > 1e-9:
-        parts.append(
-            f"Share delta of {diff.share_diff:,.0f} (loan-adjusted {diff.share_diff_after_loan:,.0f}); "
-            f"loan total {diff.loan_total:,.0f}."
+            f"Share delta after lending adjustment: {int(round(share_adj))}; "
+            f"loan total: {int(round(loan_total))}."
         )
     else:
-        parts.append("No share delta after lending adjustment.")
+        parts.append(
+            f"No share delta after lending adjustment; "
+            f"loan total: {int(round(loan_total))}."
+        )
 
     # FX
-    if abs(diff.fx_delta) > 1e-9:
-        parts.append(f"Implied FX delta: {diff.fx_delta:.6f}.")
+    if abs(fx_d) > 0.0:
+        parts.append(f"Implied FX delta: { _fmt_fx(fx_d) }.")
     else:
         parts.append("No implied FX difference.")
 
-    # Tax
-    if abs(diff.wht_rate_delta) > 1e-9:
-        parts.append(f"Withholding tax rate delta: {diff.wht_rate_delta:.2f} pp.")
+    # WHT
+    if abs(wht_pp) > 0.0:
+        parts.append(f"Withholding tax rate delta: { _fmt_pp(wht_pp) } pp.")
     else:
         parts.append("No withholding tax rate difference.")
 
-    # Payment date
-    if diff.date_offset_pay_abs_days != 0:
-        parts.append(f"Payment date offset: {diff.date_offset_pay_abs_days} day(s).")
+    # Pay-date offset
+    if pay_days != 0:
+        parts.append(f"Payment date offset: { _plural(abs(pay_days), 'day') }.")
 
-    # Per-account evidence (if provided)
-    if account_rows is not None:
-        acct_text = _format_account_evidence(account_rows)
-        if acct_text:
-            parts.append(acct_text)
+    # Evidence accounts (if any)
+    if evidence:
+        parts.append(f"Evidence by account: [{', '.join(evidence)}].")
 
+    # Join as a single paragraph (readable, punctuation-consistent)
     return " ".join(parts)

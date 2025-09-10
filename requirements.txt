@@ -8,3 +8,4 @@ tenacity
 pyyaml
 pytest
 openai
+streamlit

@@ -136,7 +136,7 @@
       "net_sc_delta": 4030.0
     }
   ],
-  "audit_text": "Event 970456789 (ISIN CH0038863350, CHF→CHF) reconciliation summary: Amount delta in quotation currency: 4,030.00. Amount delta in settlement currency: 4,030.00. Share delta of 2,000 (loan-adjusted 2,000); loan total 0. No implied FX difference. No withholding tax rate difference. Evidence by account: [823456791] SharesΔ=2,000, QCΔ=4,030.00, SCΔ=4,030.00",
+  "audit_text": "Event 970456789 (ISIN CH0038863350, CHF->CHF) reconciliation summary: Amount delta (quotation): 4,030.00. Amount delta (settlement): 4,030.00. Share delta after lending adjustment: 2000; loan total: 0. No implied FX difference. No withholding tax rate difference. Evidence by account: [823456791].",
   "remediation": {
     "actions": [
       "[P1] Verify positions vs. custody for CH0038863350: reconcile NBIM shares (45000) with custody total; investigate loans/recalls and corporate actions. Evidence: 823456791 (SharesΔ=2000, QCΔ=4030.00, SCΔ=4030.00)",
