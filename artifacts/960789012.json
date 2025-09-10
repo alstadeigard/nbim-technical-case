@@ -60,8 +60,8 @@
     "confidence": 0.6
   },
   "risk": {
-    "risk_score": 0.67,
-    "require_review": false,
+    "risk_score": 5.0,
+    "require_review": true,
     "auto_close": false
   },
   "per_account": [
@@ -81,9 +81,9 @@
   "audit_text": "Event 960789012 (ISIN KR7005930003, KRW→USD) reconciliation summary: Amount delta in quotation currency: 450,050.00. Amount delta in settlement currency: 342.77. Custody share difference of -2,000 is fully explained by lending (loan total 2,000); loan-adjusted share delta is 0. Implied FX delta: -0.000000. Withholding tax rate delta: -2.00 pp. Payment date offset: 5 day(s). Evidence by account: [712345678] SharesΔ=-2,000, QCΔ=450,050.00, SCΔ=342.77",
   "remediation": {
     "actions": [
-      "[P3] Validate withholding rate for KR7005930003: treaty rate vs. custody rate. Confirm residency docs, relief-at-source setup, and corporate action tax flags.",
-      "[P3] Align cash value dates for KR7005930003: compare custodian PAY_DATE vs internal. Check market calendars/holidays and settlement cutoffs; post timing adjustment if needed.",
-      "[P3] Trace amount delta for KR7005930003: recompute gross→net with tax/fees; confirm fee buckets (ADR/local charges) and rounding rules in both systems."
+      "[P1] Validate withholding rate for KR7005930003: treaty rate vs. custody rate. Confirm residency docs, relief-at-source setup, and corporate action tax flags.",
+      "[P1] Align cash value dates for KR7005930003: compare custodian PAY_DATE vs internal. Check market calendars/holidays and settlement cutoffs; post timing adjustment if needed.",
+      "[P1] Trace amount delta for KR7005930003: recompute gross→net with tax/fees; confirm fee buckets (ADR/local charges) and rounding rules in both systems."
     ]
   }
 }

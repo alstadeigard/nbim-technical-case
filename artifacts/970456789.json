@@ -94,7 +94,7 @@
     "confidence": 0.55
   },
   "risk": {
-    "risk_score": 3.0,
+    "risk_score": 5.0,
     "require_review": true,
     "auto_close": false
   },

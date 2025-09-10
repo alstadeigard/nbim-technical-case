@@ -1,10 +1,10 @@
 """
-Entry script: run reconciliation with optional LLM-backed classification.
+Entry script: run reconciliation with optional LLM-backed classification and config.
 
 Usage:
     python scripts/run_local.py
     python scripts/run_local.py --out artifacts --summary-csv summary.csv
-    python scripts/run_local.py --use-llm --llm-provider openai --llm-model gpt-4o-mini --out artifacts --summary-csv summary.csv
+    python scripts/run_local.py --config config.yaml --use-llm --llm-provider openai --llm-model gpt-4o-mini --out artifacts --summary-csv summary.csv
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ import os
 import sys
 from typing import Optional, List, Dict
 
-# Ensure src/ is on sys.path
 here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.abspath(os.path.join(here, os.pardir))
 sys.path.insert(0, os.path.join(root, "src"))
@@ -29,18 +28,20 @@ from recon.remediation import suggest_remediation
 from recon.export import build_event_payload, write_event_json
 from recon.summary import build_summary_dataframe
 from recon.runlog import RunLogger
+from recon.config import load_config
 
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="NBIM dividend reconciliation runner")
     p.add_argument("--nbim", type=str, default=os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv"))
     p.add_argument("--custody", type=str, default=os.path.join(root, "data", "CUSTODY_Dividend_Bookings 1.csv"))
+    p.add_argument("--config", type=str, default=os.path.join(root, "config.yaml"))
     p.add_argument("--out", type=str, default=None, help="Directory to write one JSON file per event")
     p.add_argument(
         "--summary-csv",
         type=str,
         default=None,
-        help="If set and --out is also set to a directory, 'summary.csv' will be written inside that directory unless a full path is provided.",
+        help="If set and --out is also a directory, 'summary.csv' will be written inside that directory unless a full path is provided.",
     )
     p.add_argument("--use-llm", action="store_true", help="Use LLM-backed classification.")
     p.add_argument("--llm-provider", type=str, default=None, help="openai | anthropic")
@@ -54,12 +55,14 @@ def _ensure_dir(path: str) -> None:
 
 def main() -> None:
     args = _parse_args()
+    cfg = load_config(args.config if args.config else None)
 
     run_logger = RunLogger()
     run_logger.log_run_start(
         {
             "nbim": args.nbim,
             "custody": args.custody,
+            "config": args.config,
             "out": args.out,
             "summary_csv": args.summary_csv,
             "use_llm": bool(args.use_llm),
@@ -85,7 +88,7 @@ def main() -> None:
             f"| LoanΣ={d.loan_total:.2f} | SharesΔ(loan-adj)={d.share_diff_after_loan:.2f}"
         )
 
-        rp = risk_and_policy(ev, d, cfg=None)
+        rp = risk_and_policy(ev, d, cfg=cfg)
         risks.append(rp)
         print(f"Risk: score={rp['risk_score']:.2f} | require_review={rp['require_review']} | auto_close={rp['auto_close']}")
 
@@ -133,7 +136,6 @@ def main() -> None:
                     f"(NBIM shares={r['nbim_shares']:.0f}, Custody shares={r['custody_shares']:.0f})"
                 )
 
-        # Persist per-event structured log for audit
         run_logger.log_event_summary(
             event_id=ev.event_id,
             diff={
