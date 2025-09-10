@@ -1,6 +1,5 @@
 """
-Entry script: run reconciliation, print aggregate & per-account attribution,
-and include deterministic risk flags.
+Entry script: run reconciliation, print summaries, and include per-account evidence in the audit text.
 """
 
 import os
@@ -20,7 +19,7 @@ from recon.policy import risk_and_policy
 def main() -> None:
     """
     Load CSVs, run reconciliation, print numeric summary and audit paragraph per event,
-    then print per-account attribution and risk flags.
+    including per-account evidence lines within the paragraph.
     """
     nbim_path = os.path.join(root, "data", "NBIM_Dividend_Bookings 1.csv")
     custody_path = os.path.join(root, "data", "CUSTODY_Dividend_Bookings 1.csv")
@@ -36,15 +35,17 @@ def main() -> None:
             f"| LoanΣ={d.loan_total:.2f} | SharesΔ(loan-adj)={d.share_diff_after_loan:.2f}"
         )
 
-        # Deterministic risk flags
+        # Risk flags
         rp = risk_and_policy(ev, d, cfg=None)
         print(f"Risk: score={rp['risk_score']:.2f} | require_review={rp['require_review']} | auto_close={rp['auto_close']}")
 
-        # Aggregate audit paragraph
-        print(generate_audit_paragraph(ev, d))
-
-        # Per-account attribution (only if any non-zero deltas)
+        # Per-account rows (used both for printing and to embed in audit text)
         rows = per_account_attribution(ev)
+
+        # Single, portable audit paragraph with embedded account evidence lines
+        print(generate_audit_paragraph(ev, d, account_rows=rows))
+
+        # Also print a compact per-account table if there are interesting deltas
         interesting = [
             r for r in rows
             if abs(r["share_delta"]) > 0.0 or abs(r["net_qc_delta"]) > 0.0 or abs(r["net_sc_delta"]) > 0.0
