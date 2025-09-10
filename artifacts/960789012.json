@@ -1,0 +1,89 @@
+{
+  "event_id": "960789012",
+  "isin": "KR7005930003",
+  "ex_date": "31.03.2025",
+  "pay_date": "20.05.2025",
+  "quotation_ccy": "KRW",
+  "settlement_ccy": "USD",
+  "nbim": {
+    "shares": 25000.0,
+    "div_per_share": 361.0,
+    "gross_qc": 9025000.0,
+    "net_qc": 6769950.0,
+    "net_sc": 5181.5,
+    "wht_rate": 22.0,
+    "fx_used": 0.008234
+  },
+  "nbim_accounts": [
+    {
+      "bank_account": "712345678",
+      "shares": 25000.0,
+      "gross_qc": 9025000.0,
+      "net_qc": 6769950.0,
+      "net_sc": 5181.5
+    }
+  ],
+  "custody_legs": [
+    {
+      "bank_account": "712345678",
+      "shares": 23000.0,
+      "loan_quantity": 2000.0,
+      "gross_qc": 9025000.0,
+      "net_qc": 7220000.0,
+      "tax_qc": 1805000.0,
+      "net_sc": 5524.27,
+      "fx": 1307.25,
+      "pay_date": "25.05.2025"
+    }
+  ],
+  "diff": {
+    "event_id": "960789012",
+    "amount_delta_qc": 450050.0,
+    "amount_delta_sc": 342.77000000000044,
+    "wht_rate_delta": -2.0,
+    "fx_delta": -2.3319430441336164e-07,
+    "date_offset_pay_abs_days": 5,
+    "share_diff": -2000.0,
+    "loan_total": 2000.0,
+    "share_diff_after_loan": 0.0
+  },
+  "classification": {
+    "break_types": [
+      "Tax_rate_mismatch",
+      "Timing_mismatch"
+    ],
+    "severity": "low",
+    "hypothesized_causes": [
+      "Different withholding tax rate applied",
+      "Payment date processed on different day"
+    ],
+    "confidence": 0.6
+  },
+  "risk": {
+    "risk_score": 1.03,
+    "require_review": true,
+    "auto_close": false
+  },
+  "per_account": [
+    {
+      "bank_account": "712345678",
+      "nbim_shares": 25000,
+      "custody_shares": 23000,
+      "share_delta": -2000,
+      "nbim_net_qc": 6769950.0,
+      "custody_net_qc": 7220000.0,
+      "net_qc_delta": 450050.0,
+      "nbim_net_sc": 5181.5,
+      "custody_net_sc": 5524.27,
+      "net_sc_delta": 342.77000000000044
+    }
+  ],
+  "audit_text": "Event 960789012 (ISIN KR7005930003, KRW->USD) reconciliation summary: Amount delta (quotation): 450,050.00. Amount delta (settlement): 342.77. No share delta after lending adjustment; loan total: 2000. Implied FX delta: -0.000000. Withholding tax rate delta: -2.00 pp. Payment date offset: 5 days. Evidence by account: [712345678].",
+  "remediation": {
+    "actions": [
+      "[P1] Validate withholding rate for KR7005930003: treaty rate vs. custody rate. Confirm residency docs, relief-at-source setup, and corporate action tax flags.",
+      "[P1] Align cash value dates for KR7005930003: compare custodian PAY_DATE vs internal. Check market calendars/holidays and settlement cutoffs; post timing adjustment if needed.",
+      "[P1] Trace amount delta for KR7005930003: recompute gross→net with tax/fees; confirm fee buckets (ADR/local charges) and rounding rules in both systems."
+    ]
+  }
+}

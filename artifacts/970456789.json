@@ -1,0 +1,147 @@
+{
+  "event_id": "970456789",
+  "isin": "CH0038863350",
+  "ex_date": "25.04.2025",
+  "pay_date": "29.04.2025",
+  "quotation_ccy": "CHF",
+  "settlement_ccy": "CHF",
+  "nbim": {
+    "shares": 45000.0,
+    "div_per_share": 3.1,
+    "gross_qc": 139500.0,
+    "net_qc": 90675.0,
+    "net_sc": 90675.0,
+    "wht_rate": 35.0,
+    "fx_used": 12.4567
+  },
+  "nbim_accounts": [
+    {
+      "bank_account": "823456789",
+      "shares": 20000.0,
+      "gross_qc": 62000.0,
+      "net_qc": 40300.0,
+      "net_sc": 40300.0
+    },
+    {
+      "bank_account": "823456790",
+      "shares": 15000.0,
+      "gross_qc": 46500.0,
+      "net_qc": 30225.0,
+      "net_sc": 30225.0
+    },
+    {
+      "bank_account": "823456791",
+      "shares": 10000.0,
+      "gross_qc": 31000.0,
+      "net_qc": 20150.0,
+      "net_sc": 20150.0
+    }
+  ],
+  "custody_legs": [
+    {
+      "bank_account": "823456789",
+      "shares": 20000.0,
+      "loan_quantity": 0.0,
+      "gross_qc": 62000.0,
+      "net_qc": 40300.0,
+      "tax_qc": 21700.0,
+      "net_sc": 40300.0,
+      "fx": 1.0,
+      "pay_date": "29.04.2025"
+    },
+    {
+      "bank_account": "823456790",
+      "shares": 15000.0,
+      "loan_quantity": 0.0,
+      "gross_qc": 46500.0,
+      "net_qc": 30225.0,
+      "tax_qc": 16275.0,
+      "net_sc": 30225.0,
+      "fx": 1.0,
+      "pay_date": "29.04.2025"
+    },
+    {
+      "bank_account": "823456791",
+      "shares": 12000.0,
+      "loan_quantity": 0.0,
+      "gross_qc": 37200.0,
+      "net_qc": 24180.0,
+      "tax_qc": 13020.0,
+      "net_sc": 24180.0,
+      "fx": 1.0,
+      "pay_date": "29.04.2025"
+    }
+  ],
+  "diff": {
+    "event_id": "970456789",
+    "amount_delta_qc": 4030.0,
+    "amount_delta_sc": 4030.0,
+    "wht_rate_delta": 0.0,
+    "fx_delta": 0.0,
+    "date_offset_pay_abs_days": 0,
+    "share_diff": 2000.0,
+    "loan_total": 0.0,
+    "share_diff_after_loan": 2000.0
+  },
+  "classification": {
+    "break_types": [
+      "Quantity_mismatch"
+    ],
+    "severity": "medium",
+    "hypothesized_causes": [
+      "Share count discrepancy after lending adjustment"
+    ],
+    "confidence": 0.55
+  },
+  "risk": {
+    "risk_score": 5.0,
+    "require_review": true,
+    "auto_close": false
+  },
+  "per_account": [
+    {
+      "bank_account": "823456789",
+      "nbim_shares": 20000,
+      "custody_shares": 20000,
+      "share_delta": 0,
+      "nbim_net_qc": 40300.0,
+      "custody_net_qc": 40300.0,
+      "net_qc_delta": 0.0,
+      "nbim_net_sc": 40300.0,
+      "custody_net_sc": 40300.0,
+      "net_sc_delta": 0.0
+    },
+    {
+      "bank_account": "823456790",
+      "nbim_shares": 15000,
+      "custody_shares": 15000,
+      "share_delta": 0,
+      "nbim_net_qc": 30225.0,
+      "custody_net_qc": 30225.0,
+      "net_qc_delta": 0.0,
+      "nbim_net_sc": 30225.0,
+      "custody_net_sc": 30225.0,
+      "net_sc_delta": 0.0
+    },
+    {
+      "bank_account": "823456791",
+      "nbim_shares": 10000,
+      "custody_shares": 12000,
+      "share_delta": 2000,
+      "nbim_net_qc": 20150.0,
+      "custody_net_qc": 24180.0,
+      "net_qc_delta": 4030.0,
+      "nbim_net_sc": 20150.0,
+      "custody_net_sc": 24180.0,
+      "net_sc_delta": 4030.0
+    }
+  ],
+  "audit_text": "Event 970456789 (ISIN CH0038863350, CHF->CHF) reconciliation summary: Amount delta (quotation): 4,030.00. Amount delta (settlement): 4,030.00. Share delta after lending adjustment: 2000; loan total: 0. No implied FX difference. No withholding tax rate difference. Evidence by account: [823456791].",
+  "remediation": {
+    "actions": [
+      "[P1] Verify positions vs. custody for CH0038863350: reconcile NBIM shares (45000) with custody total; investigate loans/recalls and corporate actions. Evidence: 823456791 (SharesΔ=2000, QCΔ=4030.00, SCΔ=4030.00)",
+      "[P1] Check latest share movements around EX/PAY dates (fails/late receipts). Confirm lending records and recalls cover 0 shares.",
+      "[P1] Trace amount delta for CH0038863350: recompute gross→net with tax/fees; confirm fee buckets (ADR/local charges) and rounding rules in both systems."
+    ]
+  }
+}

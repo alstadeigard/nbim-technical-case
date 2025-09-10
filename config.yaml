@@ -1,0 +1,4 @@
+formatting:
+  rounding:
+    amounts_dp: 2
+    fx_dp: 6

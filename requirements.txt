@@ -1,0 +1,11 @@
+pandas
+numpy
+pydantic
+jinja2
+pulp
+httpx
+tenacity
+pyyaml
+pytest
+openai
+streamlit

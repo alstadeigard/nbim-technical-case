@@ -1,0 +1,83 @@
+{
+  "event_id": "950123456",
+  "isin": "US0378331005",
+  "ex_date": "07.02.2025",
+  "pay_date": "14.02.2025",
+  "quotation_ccy": "USD",
+  "settlement_ccy": "USD",
+  "nbim": {
+    "shares": 1500000.0,
+    "div_per_share": 0.25,
+    "gross_qc": 375000.0,
+    "net_qc": 318750.0,
+    "net_sc": 318750.0,
+    "wht_rate": 15.0,
+    "fx_used": 11.2345
+  },
+  "nbim_accounts": [
+    {
+      "bank_account": "501234567",
+      "shares": 1500000.0,
+      "gross_qc": 375000.0,
+      "net_qc": 318750.0,
+      "net_sc": 318750.0
+    }
+  ],
+  "custody_legs": [
+    {
+      "bank_account": "501234567",
+      "shares": 1500000.0,
+      "loan_quantity": 0.0,
+      "gross_qc": 375000.0,
+      "net_qc": 318750.0,
+      "tax_qc": 56250.0,
+      "net_sc": 318750.0,
+      "fx": 1.0,
+      "pay_date": "14.02.2025"
+    }
+  ],
+  "diff": {
+    "event_id": "950123456",
+    "amount_delta_qc": 0.0,
+    "amount_delta_sc": 0.0,
+    "wht_rate_delta": 0.0,
+    "fx_delta": 0.0,
+    "date_offset_pay_abs_days": 0,
+    "share_diff": 0.0,
+    "loan_total": 0.0,
+    "share_diff_after_loan": 0.0
+  },
+  "classification": {
+    "break_types": [
+      "No_break_detected"
+    ],
+    "severity": "low",
+    "hypothesized_causes": [],
+    "confidence": 0.3
+  },
+  "risk": {
+    "risk_score": 0.0,
+    "require_review": false,
+    "auto_close": true
+  },
+  "per_account": [
+    {
+      "bank_account": "501234567",
+      "nbim_shares": 1500000,
+      "custody_shares": 1500000,
+      "share_delta": 0,
+      "nbim_net_qc": 318750.0,
+      "custody_net_qc": 318750.0,
+      "net_qc_delta": 0.0,
+      "nbim_net_sc": 318750.0,
+      "custody_net_sc": 318750.0,
+      "net_sc_delta": 0.0
+    }
+  ],
+  "audit_text": "Event 950123456 (ISIN US0378331005, USD->USD) reconciliation summary: No amount delta in quotation currency. No amount delta in settlement currency. No share delta after lending adjustment; loan total: 0. No implied FX difference. No withholding tax rate difference.",
+  "remediation": {
+    "actions": [
+      "[P3] No break to remediate for US0378331005; auto-close per policy if permitted."
+    ]
+  }
+}
