@@ -12,6 +12,7 @@ from .schemas import (
 )
 
 
+# Fields that should be converted to float for numeric processing
 _NUMERIC_NBIM_FIELDS = [
     "NOMINAL_BASIS",
     "GROSS_AMOUNT_QUOTATION",

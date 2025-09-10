@@ -22,6 +22,15 @@ def _row(
 ) -> Dict[str, object]:
     """
     Build a single summary row (dict) for the given event.
+    
+    Args:
+        event: CanonicalEvent object
+        diff: DiffRecord object
+        risk: Risk assessment results
+        classification: Classification results
+        
+    Returns:
+        Dictionary representing a single row in the summary DataFrame
     """
     break_types = classification.get("break_types", [])
     if isinstance(break_types, list):

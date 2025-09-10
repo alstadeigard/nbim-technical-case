@@ -34,6 +34,17 @@ _AUTO_CLOSE_SCORE = 0.2
 
 
 def _bounded(x: float, lo: float = 0.0, hi: float = _MAX_SCORE) -> float:
+    """
+    Bound a value between lower and upper limits.
+    
+    Args:
+        x: Value to bound
+        lo: Lower bound (default: 0.0)
+        hi: Upper bound (default: _MAX_SCORE)
+        
+    Returns:
+        Bounded value
+    """
     if x < lo:
         return lo
     if x > hi:
@@ -42,6 +53,19 @@ def _bounded(x: float, lo: float = 0.0, hi: float = _MAX_SCORE) -> float:
 
 
 def _score_from_diff(diff: DiffRecord) -> float:
+    """
+    Compute risk score from reconciliation differences.
+    
+    Uses a simplified scoring model:
+    - If settlement currency delta exists, only that is used
+    - Otherwise, score from other signals (QC amounts, shares, tax, FX, timing)
+    
+    Args:
+        diff: DiffRecord containing reconciliation differences
+        
+    Returns:
+        Risk score between 0 and _MAX_SCORE
+    """
     sc_delta = abs(diff.amount_delta_sc)
     if sc_delta > 0.0:
         # When SC delta exists, only this term is used for scoring.

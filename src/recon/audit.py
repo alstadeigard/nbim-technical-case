@@ -12,10 +12,30 @@ from typing import Iterable, Mapping, Any, List
 
 
 def _fmt_amount(x: float, dp: int = 2) -> str:
+    """
+    Format amount with comma separators and specified decimal places.
+    
+    Args:
+        x: Amount to format
+        dp: Number of decimal places
+        
+    Returns:
+        Formatted amount string
+    """
     return f"{x:,.{dp}f}"
 
 
 def _fmt_fx(x: float, dp: int = 6) -> str:
+    """
+    Format FX rate with specified decimal places, normalizing tiny values to 0.0.
+    
+    Args:
+        x: FX rate to format
+        dp: Number of decimal places
+        
+    Returns:
+        Formatted FX rate string
+    """
     # normalize tiny -0.0 to 0.0
     if abs(x) < 1e-12:
         x = 0.0
@@ -23,15 +43,44 @@ def _fmt_fx(x: float, dp: int = 6) -> str:
 
 
 def _fmt_pp(x: float, dp: int = 2) -> str:
+    """
+    Format percentage points delta with specified decimal places.
+    
+    Args:
+        x: Percentage points to format
+        dp: Number of decimal places
+        
+    Returns:
+        Formatted percentage points string
+    """
     # percentage points delta
     return f"{x:.{dp}f}"
 
 
 def _plural(n: int, s: str) -> str:
+    """
+    Format count with proper pluralization.
+    
+    Args:
+        n: Count number
+        s: Singular form of the word
+        
+    Returns:
+        Formatted string with proper pluralization
+    """
     return f"{n} {s}" if n == 1 else f"{n} {s}s"
 
 
 def _evidence_accounts(rows: Iterable[Mapping[str, Any]]) -> List[str]:
+    """
+    Extract account names that have non-zero deltas.
+    
+    Args:
+        rows: Iterable of per-account attribution rows
+        
+    Returns:
+        List of account names with deltas
+    """
     accs: List[str] = []
     for r in rows or []:
         sd = abs(float(r.get("share_delta", 0.0)))
@@ -43,6 +92,16 @@ def _evidence_accounts(rows: Iterable[Mapping[str, Any]]) -> List[str]:
 
 
 def _ccy_pair(q: str | None, s: str | None) -> str:
+    """
+    Format currency pair with ASCII-safe arrow for Windows consoles.
+    
+    Args:
+        q: Quotation currency
+        s: Settlement currency
+        
+    Returns:
+        Formatted currency pair string
+    """
     q = q or ""
     s = s or ""
     # ASCII-safe arrow for Windows consoles

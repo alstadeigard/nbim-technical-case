@@ -17,6 +17,15 @@ from .schemas import CanonicalEvent, DiffRecord
 
 
 def _acct_evidence(per_account_rows: Iterable[Dict[str, Any]]) -> List[str]:
+    """
+    Extract and format account evidence from per-account attribution rows.
+    
+    Args:
+        per_account_rows: Iterable of per-account attribution dictionaries
+        
+    Returns:
+        List of formatted evidence strings showing account deltas
+    """
     rows = list(per_account_rows)
     # Keep only rows with notable deltas
     interesting = [
@@ -37,6 +46,16 @@ def _acct_evidence(per_account_rows: Iterable[Dict[str, Any]]) -> List[str]:
 
 
 def _priority_tag(severity: str, require_review: bool) -> str:
+    """
+    Generate priority tag based on severity and review requirements.
+    
+    Args:
+        severity: Severity level ("low", "medium", "high")
+        require_review: Whether manual review is required
+        
+    Returns:
+        Priority tag string ([P1], [P2], or [P3])
+    """
     if require_review or severity == "high":
         return "[P1]"
     if severity == "medium":

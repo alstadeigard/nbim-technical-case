@@ -14,6 +14,16 @@ from .schemas import CanonicalEvent, DiffRecord
 
 
 def _coerce_float(val: object, default: float = 0.0) -> float:
+    """
+    Safely convert a value to float, returning default on failure.
+    
+    Args:
+        val: Value to convert to float
+        default: Default value to return if conversion fails
+        
+    Returns:
+        Float value or default
+    """
     try:
         return float(val)  # type: ignore[call-arg]
     except Exception:
@@ -21,6 +31,16 @@ def _coerce_float(val: object, default: float = 0.0) -> float:
 
 
 def _coerce_int(val: object, default: int = 0) -> int:
+    """
+    Safely convert a value to int, returning default on failure.
+    
+    Args:
+        val: Value to convert to int
+        default: Default value to return if conversion fails
+        
+    Returns:
+        Integer value or default
+    """
     try:
         return int(val)  # type: ignore[call-arg]
     except Exception:
@@ -96,7 +116,13 @@ def _custody_legs_rows(event: CanonicalEvent) -> list[dict[str, Any]]:
 
 def _per_account_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     """
-    Normalize per-account attribution rows from attribution.per_account_attribution(...)
+    Normalize per-account attribution rows from attribution.per_account_attribution(...).
+    
+    Args:
+        rows: Iterable of per-account attribution dictionaries
+        
+    Returns:
+        List of normalized per-account dictionaries with coerced types
     """
     out: list[dict[str, Any]] = []
     for r in rows:
@@ -130,6 +156,18 @@ def build_event_payload(
     """
     Build a serializable dict that captures event inputs, diffs, classification,
     risk flags, per-account attribution, audit narrative, and remediation actions.
+    
+    Args:
+        event: CanonicalEvent object containing event data
+        diff: DiffRecord object containing reconciliation differences
+        classification: Classification results dictionary
+        risk: Risk assessment results dictionary
+        per_account_rows: Per-account attribution data
+        audit_text: Human-readable audit narrative
+        actions: Optional list of remediation actions
+        
+    Returns:
+        Dictionary containing complete event payload for export
     """
     nbim_gross_qc = getattr(event.nbim, "gross_qc", getattr(event.nbim, "gross_amount_qc", 0.0))
     nbim_net_qc = getattr(event.nbim, "net_qc", getattr(event.nbim, "net_amount_qc", 0.0))
@@ -185,5 +223,12 @@ def build_event_payload(
 
 
 def write_event_json(path: str, payload: Dict[str, Any]) -> None:
+    """
+    Write event payload to JSON file.
+    
+    Args:
+        path: File path to write the JSON data
+        payload: Dictionary containing event data to serialize
+    """
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
